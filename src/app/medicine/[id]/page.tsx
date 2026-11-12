@@ -1,45 +1,62 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
-export default function MedicineDetails() {
+type Medicine = {
+  name?: string;
+  batchNumber?: string;
+  quantity?: number;
+  expiryDate?: string;
+  courseEndDate?: string;
+};
+
+function MedicineDetailsContent() {
   const params = useParams();
   const router = useRouter();
+
   const id = params.id as string;
 
-  const [medicine, setMedicine] = useState<any>(null);
+  const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
       try {
         const medicineRef = doc(db, "medicines", id);
-        const medicineDoc = await getDoc(medicineRef);
+        const medicineSnap = await getDoc(medicineRef);
 
-        if (!medicineDoc.exists()) {
-          setMessage("Medicine record not found.");
-        } else if (medicineDoc.data().userId !== user.uid) {
-          setMessage("You do not have permission to view this medicine.");
-        } else {
-          setMedicine(medicineDoc.data());
+        if (!medicineSnap.exists()) {
+          setMessage("Medicine not found.");
+          setLoading(false);
+          return;
         }
+
+        const data = medicineSnap.data();
+
+        if (data.userId !== user.uid) {
+          setMessage("You are not authorized to view this medicine.");
+          setLoading(false);
+          return;
+        }
+
+        setMedicine(data as Medicine);
+        setLoading(false);
       } catch (error) {
         console.error(error);
         setMessage("Unable to load medicine details.");
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -49,43 +66,50 @@ export default function MedicineDetails() {
     return <p className="p-8">Loading medicine details...</p>;
   }
 
-  if (message) {
-    return <main className="p-8 text-center text-red-600">{message}</main>;
+  if (message || !medicine) {
+    return (
+      <main className="min-h-screen bg-green-50 p-8">
+        <p className="text-red-600">{message}</p>
+        <button
+          onClick={() => router.push("/inventory")}
+          className="mt-5 rounded-lg bg-green-700 px-5 py-3 text-white"
+        >
+          Back to Inventory
+        </button>
+      </main>
+    );
   }
 
-  if (!medicine) return null;
-
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <div className="mx-auto max-w-lg rounded-xl bg-white p-6 shadow">
-        <h1 className="mb-5 text-2xl font-bold text-blue-800">
-          MediCycle AI
+    <main className="min-h-screen bg-green-50 p-6">
+      <div className="mx-auto max-w-xl rounded-2xl bg-white p-8 shadow">
+        <h1 className="mb-6 text-3xl font-bold text-green-800">
+          Medicine Details
         </h1>
 
-        <h2 className="mb-4 text-xl font-bold text-gray-800">
-          Medicine Details
-        </h2>
-
-        <div className="space-y-3 text-gray-700">
-          <p><b>Medicine:</b> {medicine.name}</p>
-          <p><b>Batch Number:</b> {medicine.batchNumber}</p>
-          <p><b>Available Quantity:</b> {medicine.quantity}</p>
-          <p><b>Expiry Date:</b> {medicine.expiryDate}</p>
-          <p><b>Course End Date:</b> {medicine.courseEndDate}</p>
+        <div className="space-y-4 text-gray-700">
+          <p><strong>Medicine Name:</strong> {medicine.name}</p>
+          <p><strong>Batch Number:</strong> {medicine.batchNumber}</p>
+          <p><strong>Available Quantity:</strong> {medicine.quantity}</p>
+          <p><strong>Expiry Date:</strong> {medicine.expiryDate}</p>
+          <p><strong>Course End Date:</strong> {medicine.courseEndDate || "Not specified"}</p>
         </div>
-
-        <p className="mt-5 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-          This medicine record is private and can only be viewed by its
-          registered owner after login.
-        </p>
 
         <button
           onClick={() => router.push("/inventory")}
-          className="mt-5 w-full rounded-lg bg-blue-600 p-3 text-white"
+          className="mt-8 w-full rounded-lg bg-green-700 p-3 font-semibold text-white hover:bg-green-800"
         >
           Back to Inventory
         </button>
       </div>
     </main>
+  );
+}
+
+export default function MedicineDetails() {
+  return (
+    <Suspense fallback={<p className="p-8">Loading medicine page...</p>}>
+      <MedicineDetailsContent />
+    </Suspense>
   );
 }
