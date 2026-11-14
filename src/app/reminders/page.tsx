@@ -19,31 +19,44 @@ import { enableMedicineNotifications } from "@/lib/messaging";
 
 type Reminder = {
   id: string;
+  medicineId?: string;
   medicineName: string;
   reminderTime: string;
   frequency: string;
   userId: string;
 };
 
+type Medicine = {
+  id: string;
+  name: string;
+  userId: string;
+};
+
 export default function ReminderPage() {
   const router = useRouter();
 
-  const [medicineName, setMedicineName] = useState("");
+  const [selectedMedicineId, setSelectedMedicineId] = useState("");
   const [reminderTime, setReminderTime] = useState("");
   const [frequency, setFrequency] = useState("Daily");
+
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [medicinesLoading, setMedicinesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
 
   const alertedReminders = useRef(new Set<string>());
 
+  // Check login
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push("/login");
         setLoading(false);
+        setMedicinesLoading(false);
         return;
       }
 
@@ -53,6 +66,37 @@ export default function ReminderPage() {
     return () => unsubscribeAuth();
   }, [router]);
 
+  // Load existing medicines from Inventory
+  useEffect(() => {
+    if (!userId) return;
+
+    const medicinesQuery = query(
+      collection(db, "medicines"),
+      where("userId", "==", userId)
+    );
+
+    const unsubscribe = onSnapshot(
+      medicinesQuery,
+      (snapshot) => {
+        const list = snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        })) as Medicine[];
+
+        setMedicines(list);
+        setMedicinesLoading(false);
+      },
+      (error) => {
+        console.error("Medicine loading error:", error);
+        alert("Could not load your medicines.");
+        setMedicinesLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  // Load existing reminders
   useEffect(() => {
     if (!userId) return;
 
@@ -82,6 +126,7 @@ export default function ReminderPage() {
     return () => unsubscribe();
   }, [userId]);
 
+  // Existing in-page reminder alerts
   useEffect(() => {
     if (!userId || reminders.length === 0) return;
 
@@ -122,6 +167,7 @@ export default function ReminderPage() {
     return () => window.clearInterval(timer);
   }, [reminders, userId]);
 
+  // Enable browser notifications
   const handleEnableNotifications = async () => {
     setNotificationLoading(true);
 
@@ -139,11 +185,16 @@ export default function ReminderPage() {
     }
   };
 
+  // Add reminder using selected Inventory medicine
   const addReminder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!medicineName.trim() || !reminderTime) {
-      alert("Please enter the medicine name and reminder time.");
+    const selectedMedicine = medicines.find(
+      (medicine) => medicine.id === selectedMedicineId
+    );
+
+    if (!selectedMedicine || !reminderTime) {
+      alert("Please select a medicine and reminder time.");
       return;
     }
 
@@ -157,14 +208,15 @@ export default function ReminderPage() {
 
     try {
       await addDoc(collection(db, "reminders"), {
-        medicineName: medicineName.trim(),
+        medicineId: selectedMedicine.id,
+        medicineName: selectedMedicine.name,
         reminderTime,
         frequency,
         userId: auth.currentUser.uid,
         createdAt: serverTimestamp(),
       });
 
-      setMedicineName("");
+      setSelectedMedicineId("");
       setReminderTime("");
       setFrequency("Daily");
 
@@ -177,6 +229,7 @@ export default function ReminderPage() {
     }
   };
 
+  // Delete reminder
   const deleteReminder = async (id: string) => {
     if (!confirm("Are you sure you want to delete this reminder?")) return;
 
@@ -212,15 +265,15 @@ export default function ReminderPage() {
           </button>
         </header>
 
-        {/* Enable browser notifications */}
+        {/* Browser notifications */}
         <section className="mb-8 rounded-2xl border border-blue-100 bg-white p-6 shadow-md">
           <h2 className="text-xl font-bold text-gray-800">
             🔔 Browser Notifications
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            Enable browser notification permission for MediCycle. This is
-            required for future background reminder setup.
+            Enable browser notification permission for MediCycle to receive
+            supported medicine reminder notifications.
           </p>
 
           <button
@@ -234,6 +287,7 @@ export default function ReminderPage() {
           </button>
         </section>
 
+        {/* Add reminder */}
         <section className="mb-8 rounded-2xl border border-green-100 bg-white p-6 shadow-md md:p-8">
           <div className="mb-6">
             <span className="text-3xl">⏰</span>
@@ -241,24 +295,51 @@ export default function ReminderPage() {
               Add New Reminder
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Enter the medicine details from your verified prescription.
+              Select a medicine already saved in your Inventory.
             </p>
           </div>
 
           <form onSubmit={addReminder} className="space-y-5">
+
             <div>
               <label className="mb-2 block font-semibold text-gray-700">
-                Medicine Name
+                Select Medicine
               </label>
 
-              <input
-                type="text"
+              <select
                 required
-                value={medicineName}
-                onChange={(e) => setMedicineName(e.target.value)}
-                placeholder="Example: Paracetamol"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-gray-800 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
-              />
+                value={selectedMedicineId}
+                onChange={(e) => setSelectedMedicineId(e.target.value)}
+                disabled={medicinesLoading || medicines.length === 0}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-gray-800 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:opacity-60"
+              >
+                <option value="">
+                  {medicinesLoading
+                    ? "Loading medicines..."
+                    : medicines.length === 0
+                    ? "No medicines found in Inventory"
+                    : "Choose a medicine"}
+                </option>
+
+                {medicines.map((medicine) => (
+                  <option key={medicine.id} value={medicine.id}>
+                    {medicine.name}
+                  </option>
+                ))}
+              </select>
+
+              {medicines.length === 0 && !medicinesLoading && (
+                <p className="mt-2 text-sm text-amber-700">
+                  Please add a medicine to your Inventory first.
+                  <button
+                    type="button"
+                    onClick={() => router.push("/medicines/add")}
+                    className="ml-1 font-bold text-green-800 underline"
+                  >
+                    Add Medicine
+                  </button>
+                </p>
+              )}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
@@ -293,7 +374,11 @@ export default function ReminderPage() {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={
+                saving ||
+                medicinesLoading ||
+                medicines.length === 0
+              }
               className="w-full rounded-xl bg-gradient-to-r from-green-700 to-emerald-500 p-3.5 font-bold text-white shadow-md hover:from-green-800 hover:to-emerald-600 disabled:opacity-60"
             >
               {saving ? "Saving..." : "+ Save Reminder"}
@@ -301,6 +386,7 @@ export default function ReminderPage() {
           </form>
         </section>
 
+        {/* Saved reminders */}
         <section className="rounded-2xl border border-green-100 bg-white p-6 shadow-md md:p-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -370,10 +456,10 @@ export default function ReminderPage() {
 
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm leading-6 text-amber-900">
-            <strong>Important:</strong> The existing time-based alert works
-            only while the website is open and your browser is awake.
-            Enabling browser notifications alone does not yet schedule
-            background medicine reminders. Follow your verified prescription.
+            <strong>Important:</strong> Browser notifications depend on
+            notification permission, device settings and browser availability.
+            In-page alerts work only while the website is open and the browser
+            is awake. Always follow your verified prescription.
           </p>
         </div>
 

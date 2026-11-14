@@ -68,14 +68,15 @@ export async function GET(request: Request) {
 
     const { date, time } = getIndiaTime();
 
-    const snapshot = await db
+    // 1. Existing medicine reminders
+    const reminderSnapshot = await db
       .collection("reminders")
       .where("reminderTime", "==", time)
       .get();
 
-    let sent = 0;
+    let medicineSent = 0;
 
-    for (const reminderDoc of snapshot.docs) {
+    for (const reminderDoc of reminderSnapshot.docs) {
       const reminder = reminderDoc.data();
 
       if (reminder.frequency !== "Daily" || !reminder.userId) {
@@ -86,8 +87,6 @@ export async function GET(request: Request) {
         .collection("notificationTokens")
         .doc(reminder.userId)
         .get();
-
-      if (!tokenDoc.exists) continue;
 
       const token = tokenDoc.data()?.token;
       if (!token) continue;
@@ -123,18 +122,94 @@ export async function GET(request: Request) {
           },
         });
 
-        sent++;
+        medicineSent++;
       } catch (error) {
         await sentRef.delete();
-        console.error("Notification sending failed:", error);
+        console.error("Medicine notification failed:", error);
+      }
+    }
+
+    // 2. Disposal reminders
+    const disposalSnapshot = await db
+      .collection("disposalPlans")
+      .where("plannedDate", "==", date)
+      .get();
+
+    let disposalSent = 0;
+
+    for (const planDoc of disposalSnapshot.docs) {
+      const plan = planDoc.data();
+
+      if (
+        plan.status !== "Scheduled" ||
+        !plan.userId ||
+        typeof plan.plannedTime !== "string" ||
+        !/^\d{2}:\d{2}$/.test(plan.plannedTime)
+      ) {
+        continue;
+      }
+
+      // Send when the planned time has arrived.
+      // This also catches up if the scheduler runs a little late.
+      if (plan.plannedTime > time) {
+        continue;
+      }
+
+      const tokenDoc = await db
+        .collection("notificationTokens")
+        .doc(plan.userId)
+        .get();
+
+      const token = tokenDoc.data()?.token;
+      if (!token) continue;
+
+      // One notification per disposal plan per scheduled date.
+      const sentRef = db
+        .collection("sentDisposalReminders")
+        .doc(`${date}_${planDoc.id}`);
+
+      const shouldSend = await db.runTransaction(async (transaction) => {
+        const existing = await transaction.get(sentRef);
+
+        if (existing.exists) return false;
+
+        transaction.set(sentRef, {
+          planId: planDoc.id,
+          userId: plan.userId,
+          date,
+          plannedTime: plan.plannedTime,
+          sentAt: new Date(),
+        });
+
+        return true;
+      });
+
+      if (!shouldSend) continue;
+
+      try {
+        await messaging.send({
+          token,
+          data: {
+            title: "MediCycle Disposal Reminder",
+            body: `Your planned disposal for ${plan.medicineName} is due. Read the safety instructions before disposing.`,
+            url: "/inventory",
+          },
+        });
+
+        disposalSent++;
+      } catch (error) {
+        await sentRef.delete();
+        console.error("Disposal notification failed:", error);
       }
     }
 
     return NextResponse.json({
       success: true,
-      time,
       date,
-      notificationsSent: sent,
+      time,
+      medicineNotificationsSent: medicineSent,
+      disposalNotificationsSent: disposalSent,
+      notificationsSent: medicineSent + disposalSent,
     });
   } catch (error) {
     console.error("Reminder API error:", error);
