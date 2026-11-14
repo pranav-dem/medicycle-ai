@@ -28,7 +28,7 @@ messaging.onBackgroundMessage((payload) => {
       "It is time to check your medicine reminder.",
     icon: "/medicycle.svg",
     data: {
-      url: "https://medicycle-ai.vercel.app/reminders"
+      url: `${self.location.origin}/reminders`
     }
   };
 
@@ -38,9 +38,9 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  event.waitUntil(
-    clients.openWindow(
-      "https://medicycle-ai.vercel.app/reminders"
-    )
-  );
+  const targetUrl =
+    event.notification.data?.url ||
+    `${self.location.origin}/reminders`;
+
+  event.waitUntil(clients.openWindow(targetUrl));
 });
