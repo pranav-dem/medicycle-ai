@@ -1,5 +1,5 @@
 
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
@@ -47,6 +47,8 @@ function getIndiaTime() {
 }
 
 export async function GET(request: Request) {
+  await connection();
+
   try {
     const secret = process.env.CRON_SECRET;
 
