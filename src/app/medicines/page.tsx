@@ -214,7 +214,6 @@ export default function AddMedicine() {
       .filter(Boolean);
 
     for (const line of lines) {
-      // Look only at lines containing an MRP label.
       if (!/\bM\s*\.?\s*R\s*\.?\s*P\s*\.?\b/i.test(line)) {
         continue;
       }
@@ -568,10 +567,10 @@ export default function AddMedicine() {
                 Capture a photo using your phone camera or upload a medicine image.
               </p>
 
+              {/* Removed capture="environment" so mobile users can choose an image */}
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handleFileChange}
                 className="mt-4 block w-full text-sm text-gray-700"
               />
