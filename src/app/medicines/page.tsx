@@ -31,6 +31,9 @@ export default function AddMedicine() {
   const engineRef = useRef<any>(null);
   const initializationRef = useRef<Promise<any> | null>(null);
 
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
   const [name, setName] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -329,10 +332,8 @@ export default function AddMedicine() {
     };
   }
 
-  // Handle selected image
-  function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
+  // Handle selected image from camera or gallery
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const selectedFile = event.target.files?.[0] || null;
 
     if (selectedFile && !selectedFile.type.startsWith("image/")) {
@@ -356,6 +357,9 @@ export default function AddMedicine() {
     } else {
       setOcrMessage("Please select a medicine image.");
     }
+
+    // Allows selecting the same image again
+    event.target.value = "";
   }
 
   // Scan medicine image
@@ -564,16 +568,45 @@ export default function AddMedicine() {
               </h3>
 
               <p className="mt-2 text-sm text-gray-600">
-                Capture a photo using your phone camera or upload a medicine image.
+                Take a new photo using your camera or choose an existing medicine image from your gallery.
               </p>
 
-              {/* Removed capture="environment" so mobile users can choose an image */}
+              {/* Camera input */}
               <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {/* Gallery input */}
+              <input
+                ref={galleryInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
-                className="mt-4 block w-full text-sm text-gray-700"
+                className="hidden"
               />
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="rounded-xl bg-green-800 p-4 font-bold text-white hover:bg-green-900"
+                >
+                  📸 Take Photo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="rounded-xl border-2 border-green-700 bg-white p-4 font-bold text-green-800 hover:bg-green-100"
+                >
+                  🖼️ Choose from Gallery
+                </button>
+              </div>
 
               {photo && (
                 <div className="mt-3 rounded-lg bg-white p-3">
@@ -583,6 +616,18 @@ export default function AddMedicine() {
                   <p className="mt-1 text-xs text-gray-500">
                     {(photo.size / 1024).toFixed(1)} KB
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoto(null);
+                      setOcrText([]);
+                      setPriceMessage("");
+                      setOcrMessage("Please select a medicine image.");
+                    }}
+                    className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                  >
+                    Remove selected image
+                  </button>
                 </div>
               )}
 
