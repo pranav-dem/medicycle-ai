@@ -250,7 +250,7 @@ export default function WasteAnalyticsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-50">
-        <p className="text-green-700 font-semibold">
+        <p className="text-green-800 font-semibold">
           Loading MediCycle Analytics...
         </p>
       </div>
@@ -263,7 +263,7 @@ export default function WasteAnalyticsPage() {
 
         <button
           onClick={() => router.push("/waste-intelligence")}
-          className="mb-7 rounded-xl border border-green-200 bg-white px-5 py-2.5 font-semibold text-green-700 hover:bg-green-50"
+          className="mb-7 rounded-xl border border-green-200 bg-white px-5 py-2.5 font-semibold text-green-800 hover:bg-green-50"
         >
           ← Back to Waste Intelligence
         </button>
@@ -277,28 +277,34 @@ export default function WasteAnalyticsPage() {
             Waste Analytics Dashboard
           </h1>
 
-          <p className="text-green-50">
+          <p className="text-white">
             Understand medicine waste through statistics, charts and reports.
           </p>
         </section>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-            <p className="text-gray-500 text-sm">Total Unused Tablets</p>
+            <p className="text-gray-800 text-sm font-semibold">
+              Total Unused Tablets
+            </p>
             <h2 className="text-3xl font-bold text-green-700 mt-2">
               {totalTablets}
             </h2>
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-            <p className="text-gray-500 text-sm">Estimated Financial Loss</p>
+            <p className="text-gray-800 text-sm font-semibold">
+              Estimated Financial Loss
+            </p>
             <h2 className="text-3xl font-bold text-orange-600 mt-2">
               ₹{totalLoss.toFixed(2)}
             </h2>
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-            <p className="text-gray-500 text-sm">Total Waste Records</p>
+            <p className="text-gray-800 text-sm font-semibold">
+              Total Waste Records
+            </p>
             <h2 className="text-3xl font-bold text-blue-700 mt-2">
               {records.length}
             </h2>
@@ -317,11 +323,11 @@ export default function WasteAnalyticsPage() {
 
         {records.length === 0 ? (
           <section className="bg-white rounded-2xl shadow-md p-8 text-center">
-            <h2 className="text-xl font-bold text-gray-800">
+            <h2 className="text-xl font-bold text-gray-900">
               No Analytics Available Yet
             </h2>
 
-            <p className="text-gray-500 mt-2">
+            <p className="text-gray-800 mt-2">
               Add waste records to see your analytics and charts.
             </p>
 
@@ -337,15 +343,15 @@ export default function WasteAnalyticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
               <section className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">
                   Waste by Reason
                 </h2>
 
                 {reasonEntries.map(([reason, quantity], index) => (
                   <div key={reason} className="mb-5">
                     <div className="flex justify-between text-sm mb-2 gap-3">
-                      <span className="text-gray-700">{reason}</span>
-                      <strong>{quantity} tablets</strong>
+                      <span className="text-gray-800 font-medium">{reason}</span>
+                      <strong className="text-gray-900">{quantity} tablets</strong>
                     </div>
 
                     <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -362,7 +368,7 @@ export default function WasteAnalyticsPage() {
               </section>
 
               <section className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">
                   Waste Distribution
                 </h2>
 
@@ -372,7 +378,7 @@ export default function WasteAnalyticsPage() {
                     style={{ background: pieGradient }}
                   >
                     <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center">
-                      <p className="font-bold text-gray-700 text-center">
+                      <p className="font-bold text-gray-900 text-center">
                         {totalTablets}
                         <br />
                         Tablets
@@ -387,8 +393,8 @@ export default function WasteAnalyticsPage() {
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: colors[index % colors.length] }}
                         />
-                        <span className="flex-1 text-gray-700">{reason}</span>
-                        <strong>{quantity}</strong>
+                        <span className="flex-1 text-gray-800">{reason}</span>
+                        <strong className="text-gray-900">{quantity}</strong>
                       </div>
                     ))}
                   </div>
@@ -396,15 +402,15 @@ export default function WasteAnalyticsPage() {
               </section>
 
               <section className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">
                   Medicine-wise Waste
                 </h2>
 
                 {medicineEntries.map(([medicine, quantity], index) => (
                   <div key={medicine} className="mb-5">
                     <div className="flex justify-between text-sm mb-2 gap-3">
-                      <span className="text-gray-700">{medicine}</span>
-                      <strong>{quantity} tablets</strong>
+                      <span className="text-gray-800 font-medium">{medicine}</span>
+                      <strong className="text-gray-900">{quantity} tablets</strong>
                     </div>
 
                     <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -421,22 +427,22 @@ export default function WasteAnalyticsPage() {
               </section>
 
               <section className="bg-white rounded-2xl p-6 shadow-md border border-green-100">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">
                   Monthly Waste Trend
                 </h2>
 
                 {monthlyEntries.length === 0 ? (
-                  <p className="text-gray-500">
+                  <p className="text-gray-800">
                     Monthly data will appear for records with saved dates.
                   </p>
                 ) : (
                   monthlyEntries.map(([key, quantity]) => (
                     <div key={key} className="mb-5">
                       <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-700">
+                        <span className="text-gray-800 font-medium">
                           {key.split("|")[1]}
                         </span>
-                        <strong>{quantity} tablets</strong>
+                        <strong className="text-gray-900">{quantity} tablets</strong>
                       </div>
 
                       <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -454,7 +460,7 @@ export default function WasteAnalyticsPage() {
             </div>
 
             <section className="bg-white rounded-2xl p-6 md:p-8 shadow-md border border-green-100">
-              <h2 className="text-2xl font-bold text-gray-800 mb-5">
+              <h2 className="text-2xl font-bold text-gray-900 mb-5">
                 Individual Waste Records
               </h2>
 
@@ -465,19 +471,19 @@ export default function WasteAnalyticsPage() {
                     className="rounded-xl border border-green-100 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
                   >
                     <div>
-                      <h3 className="font-bold text-gray-800 text-lg">
+                      <h3 className="font-bold text-gray-900 text-lg">
                         {record.medicineName}
                       </h3>
 
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-gray-800 mt-1">
                         Quantity: {record.unusedQuantity} tablets
                       </p>
 
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-800">
                         Reason: {record.reason}
                       </p>
 
-                      <p className="text-green-700 font-bold mt-2">
+                      <p className="text-green-800 font-bold mt-2">
                         Estimated value: ₹
                         {Number(record.estimatedValue || 0).toFixed(2)}
                       </p>
@@ -485,7 +491,7 @@ export default function WasteAnalyticsPage() {
 
                     <button
                       onClick={() => deleteRecord(record.id)}
-                      className="rounded-lg bg-red-50 border border-red-200 text-red-600 px-5 py-2 font-semibold hover:bg-red-100"
+                      className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-5 py-2 font-semibold hover:bg-red-100"
                     >
                       Delete Record
                     </button>
@@ -496,7 +502,7 @@ export default function WasteAnalyticsPage() {
           </>
         )}
 
-        <p className="text-center text-xs text-gray-500 mt-7">
+        <p className="text-center text-sm text-gray-700 mt-7">
           MediCycle analytics use user-entered information and estimates.
           Deleting a waste record does not change medicine inventory or
           disposal history.

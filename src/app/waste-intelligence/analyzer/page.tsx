@@ -21,6 +21,7 @@ type Medicine = {
   name: string;
   batchNumber?: string;
   quantity: number;
+  pricePerUnit?: number | string;
 };
 
 type WasteRecord = {
@@ -137,7 +138,31 @@ export default function WasteAnalyzerPage() {
   const estimatedValue =
     quantity > 0 && price > 0 ? quantity * price : 0;
 
-  const saveWasteRecord = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleMedicineChange = (selectedId: string) => {
+    setMedicineId(selectedId);
+    setUnusedQuantity("");
+
+    const medicine = medicines.find(
+      (item) => item.id === selectedId
+    );
+
+    if (!medicine) {
+      setPricePerTablet("");
+      return;
+    }
+
+    const savedPrice = Number(medicine.pricePerUnit);
+
+    if (Number.isFinite(savedPrice) && savedPrice > 0) {
+      setPricePerTablet(String(savedPrice));
+    } else {
+      setPricePerTablet("");
+    }
+  };
+
+  const saveWasteRecord = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
 
     const user = auth.currentUser;
@@ -180,7 +205,7 @@ export default function WasteAnalyzerPage() {
         unusedQuantity: quantity,
         reason,
         pricePerTablet: price,
-        estimatedValue,
+        estimatedValue: quantity * price,
         createdAt: serverTimestamp(),
       });
 
@@ -227,7 +252,6 @@ export default function WasteAnalyzerPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 px-5 py-10">
       <div className="max-w-5xl mx-auto">
-
         <button
           onClick={() => router.push("/waste-intelligence")}
           className="mb-7 rounded-xl border border-green-200 bg-white px-5 py-2.5 font-semibold text-green-700 hover:bg-green-50"
@@ -264,6 +288,7 @@ export default function WasteAnalyzerPage() {
             <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-5 text-yellow-800">
               No medicines found in your inventory. Add a medicine
               before recording waste.
+
               <button
                 onClick={() => router.push("/medicines")}
                 className="block mt-3 font-bold underline"
@@ -273,7 +298,6 @@ export default function WasteAnalyzerPage() {
             </div>
           ) : (
             <form onSubmit={saveWasteRecord} className="space-y-5">
-
               <div>
                 <label className="block font-semibold text-gray-700 mb-2">
                   Select Medicine
@@ -281,10 +305,9 @@ export default function WasteAnalyzerPage() {
 
                 <select
                   value={medicineId}
-                  onChange={(e) => {
-                    setMedicineId(e.target.value);
-                    setUnusedQuantity("");
-                  }}
+                  onChange={(e) =>
+                    handleMedicineChange(e.target.value)
+                  }
                   required
                   className="w-full rounded-xl border border-gray-300 p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
@@ -303,6 +326,7 @@ export default function WasteAnalyzerPage() {
                   <p className="text-sm text-gray-600">
                     Available inventory quantity
                   </p>
+
                   <p className="text-2xl font-bold text-green-700">
                     {selectedMedicine.quantity} tablets
                   </p>
@@ -320,7 +344,9 @@ export default function WasteAnalyzerPage() {
                   max={selectedMedicine?.quantity || undefined}
                   step="1"
                   value={unusedQuantity}
-                  onChange={(e) => setUnusedQuantity(e.target.value)}
+                  onChange={(e) =>
+                    setUnusedQuantity(e.target.value)
+                  }
                   required
                   placeholder="Enter unused tablet quantity"
                   className="w-full rounded-xl border border-gray-300 p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -355,11 +381,32 @@ export default function WasteAnalyzerPage() {
                   min="0.01"
                   step="0.01"
                   value={pricePerTablet}
-                  onChange={(e) => setPricePerTablet(e.target.value)}
+                  onChange={(e) =>
+                    setPricePerTablet(e.target.value)
+                  }
                   required
                   placeholder="Enter price of one tablet"
                   className="w-full rounded-xl border border-gray-300 p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
+
+                {selectedMedicine &&
+                  Number(selectedMedicine.pricePerUnit) > 0 && (
+                    <p className="text-sm text-green-700 mt-2">
+                      <span className="font-semibold">
+                        Price fetched from your inventory.
+                      </span>
+                      {" "}You can edit it if necessary.
+                    </p>
+                  )}
+
+                {selectedMedicine &&
+                  !(Number(selectedMedicine.pricePerUnit) > 0) && (
+                    <p className="text-sm text-amber-700 mt-2">
+                      No saved price found for this medicine.
+                      Enter the price manually. Older medicines may
+                      not have a price saved.
+                    </p>
+                  )}
               </div>
 
               <div className="rounded-2xl bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 p-6">
@@ -444,11 +491,10 @@ export default function WasteAnalyzerPage() {
         </section>
 
         <p className="text-xs text-gray-500 text-center mt-6">
-          Financial values are estimates based on the price entered by
-          the user. Recording or deleting a waste entry does not change
-          medicine inventory or confirm physical disposal.
+          Financial values are estimates based on the saved or manually
+          entered price. Recording or deleting a waste entry does not
+          change medicine inventory or confirm physical disposal.
         </p>
-
       </div>
     </main>
   );

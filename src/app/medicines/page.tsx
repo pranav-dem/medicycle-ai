@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -20,6 +21,8 @@ type MedicineDetails = {
   batch: string;
   quantity: number | null;
   expiry: string;
+  pricePerUnit: number | null;
+  priceMessage: string;
 };
 
 export default function AddMedicine() {
@@ -31,6 +34,7 @@ export default function AddMedicine() {
   const [name, setName] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [pricePerUnit, setPricePerUnit] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [courseEndDate, setCourseEndDate] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -39,9 +43,8 @@ export default function AddMedicine() {
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ocrText, setOcrText] = useState<OCRResult[]>([]);
-  const [ocrMessage, setOcrMessage] = useState(
-    "Loading OCR library..."
-  );
+  const [ocrMessage, setOcrMessage] = useState("Loading OCR library...");
+  const [priceMessage, setPriceMessage] = useState("");
 
   // Load PaddleOCR in the browser
   useEffect(() => {
@@ -97,7 +100,7 @@ export default function AddMedicine() {
     };
   }, []);
 
-  // Initialize PaddleOCR using the same settings as the working test page
+  // Initialize PaddleOCR
   async function initializeOCR() {
     if (engineRef.current) {
       return engineRef.current;
@@ -116,7 +119,6 @@ export default function AddMedicine() {
     const initialization = PaddleOCR.create({
       textDetectionModelName: "PP-OCRv6_tiny_det",
       textRecognitionModelName: "PP-OCRv6_tiny_rec",
-      // IMPORTANT: Keep this false.
       worker: false,
       ortOptions: {
         backend: "auto",
@@ -136,20 +138,23 @@ export default function AddMedicine() {
     }
   }
 
-  // Convert expiry date into HTML date input format
+  // Parse expiry date
   function parseExpiryDate(text: string): string {
     const normalized = text.replace(/\s+/g, " ").trim();
 
-    // Prefer the text after an expiry label, but also support a date without a label.
     const labelPattern =
       /(?:EXP(?:IRY)?(?:\s+DATE)?|EXPIRES|USE\s+BEFORE)\s*[:.-]?\s*/i;
+
     const labelMatch = normalized.match(labelPattern);
+
     const dateText = labelMatch
       ? normalized.slice(labelMatch.index! + labelMatch[0].length)
       : normalized;
 
-    // DD/MM/YYYY, DD-MM-YYYY or DD.MM.YYYY
-    let match = dateText.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/);
+    let match = dateText.match(
+      /\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/
+    );
+
     if (match) {
       const day = Number(match[1]);
       const month = Number(match[2]);
@@ -166,24 +171,34 @@ export default function AddMedicine() {
       }
     }
 
-    // MM/YYYY, MM-YYYY or MM.YYYY, including a bare value such as 08/2026.
-    match = dateText.match(/\b(0?[1-9]|1[0-2])[\/.-](\d{4})\b/);
+    // MM/YYYY
+    match = dateText.match(
+      /\b(0?[1-9]|1[0-2])[\/.-](\d{4})\b/
+    );
+
     if (match) {
       const month = Number(match[1]);
       const year = Number(match[2]);
+
       if (year >= 2000) {
         const lastDay = new Date(year, month, 0).getDate();
+
         return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       }
     }
 
-    // YYYY/MM or YYYY-MM
-    match = dateText.match(/\b(\d{4})[\/.-](0?[1-9]|1[0-2])\b/);
+    // YYYY/MM
+    match = dateText.match(
+      /\b(\d{4})[\/.-](0?[1-9]|1[0-2])\b/
+    );
+
     if (match) {
       const year = Number(match[1]);
       const month = Number(match[2]);
+
       if (year >= 2000) {
         const lastDay = new Date(year, month, 0).getDate();
+
         return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       }
     }
@@ -191,7 +206,41 @@ export default function AddMedicine() {
     return "";
   }
 
-  // Extract possible medicine information from OCR text
+  // Extract MRP from OCR text
+  function extractMRP(text: string): number | null {
+    const lines = text
+      .split(/\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      // Look only at lines containing an MRP label.
+      if (!/\bM\s*\.?\s*R\s*\.?\s*P\s*\.?\b/i.test(line)) {
+        continue;
+      }
+
+      const afterMRP = line.replace(
+        /^.*?\bM\s*\.?\s*R\s*\.?\s*P\s*\.?\b/i,
+        ""
+      );
+
+      const priceMatch = afterMRP.match(
+        /(?:₹|RS\.?|INR)?\s*(\d{1,5}(?:[.,]\d{1,2})?)\b/i
+      );
+
+      if (priceMatch) {
+        const amount = Number(priceMatch[1].replace(",", "."));
+
+        if (Number.isFinite(amount) && amount > 0 && amount < 100000) {
+          return amount;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Extract medicine information
   function extractMedicineDetails(
     results: OCRResult[]
   ): MedicineDetails {
@@ -201,7 +250,6 @@ export default function AddMedicine() {
 
     const fullText = lines.join("\n");
 
-    // Batch number
     let batch = "";
 
     for (let i = 0; i < lines.length; i++) {
@@ -228,7 +276,6 @@ export default function AddMedicine() {
       }
     }
 
-    // Quantity
     const quantityMatch = fullText.match(
       /\b(\d{1,3})\s*(?:TABLETS?|TABS?|CAPSULES?|CAPS?)\b/i
     );
@@ -237,7 +284,26 @@ export default function AddMedicine() {
       ? Number(quantityMatch[1])
       : null;
 
-    // Try to identify a likely medicine name
+    const mrp = extractMRP(fullText);
+
+    let extractedPrice: number | null = null;
+    let extractedPriceMessage = "";
+
+    if (mrp !== null && extractedQuantity !== null && extractedQuantity > 0) {
+      extractedPrice = Number((mrp / extractedQuantity).toFixed(2));
+      extractedPriceMessage =
+        `MRP ₹${mrp.toFixed(2)} detected. ` +
+        `Divided by ${extractedQuantity} tablets per pack. ` +
+        `Please verify the price.`;
+    } else if (mrp !== null) {
+      extractedPriceMessage =
+        `MRP ₹${mrp.toFixed(2)} detected, but pack size was not detected. ` +
+        "Enter the price per tablet manually.";
+    } else {
+      extractedPriceMessage =
+        "MRP was not detected. Please enter the price per tablet manually.";
+    }
+
     const excludedWords =
       /BATCH|LOT|EXPIRY|EXPIRES|MFG|MANUFACTURED|MRP|PRICE|QTY|CAPSULE|TABLET|SCHEDULE|STORAGE|CAUTION|PRIVATE|LIMITED|DISTRICT|PLOT|LIC|COMPOSITION|DOSAGE|STRIP|TABLETS|CAPSULES/i;
 
@@ -259,10 +325,12 @@ export default function AddMedicine() {
       batch,
       quantity: extractedQuantity,
       expiry: parseExpiryDate(fullText),
+      pricePerUnit: extractedPrice,
+      priceMessage: extractedPriceMessage,
     };
   }
 
-  // Handle selected medicine image
+  // Handle selected image
   function handleFileChange(
     event: ChangeEvent<HTMLInputElement>
   ) {
@@ -282,6 +350,7 @@ export default function AddMedicine() {
 
     setPhoto(selectedFile);
     setOcrText([]);
+    setPriceMessage("");
 
     if (selectedFile) {
       setOcrMessage("Image selected. Ready to scan.");
@@ -290,7 +359,7 @@ export default function AddMedicine() {
     }
   }
 
-  // Scan medicine image directly in the browser
+  // Scan medicine image
   async function handleScan() {
     if (!photo) {
       alert("Please select a medicine photo first.");
@@ -331,21 +400,20 @@ export default function AddMedicine() {
 
       const details = extractMedicineDetails(extracted);
 
-      if (details.name) {
-        setName(details.name);
-      }
-
-      if (details.batch) {
-        setBatchNumber(details.batch);
-      }
+      if (details.name) setName(details.name);
+      if (details.batch) setBatchNumber(details.batch);
 
       if (details.quantity !== null) {
         setQuantity(String(details.quantity));
       }
 
-      if (details.expiry) {
-        setExpiryDate(details.expiry);
+      if (details.expiry) setExpiryDate(details.expiry);
+
+      if (details.pricePerUnit !== null) {
+        setPricePerUnit(details.pricePerUnit.toFixed(2));
       }
+
+      setPriceMessage(details.priceMessage);
 
       setOcrMessage(
         "Scan completed! Check and correct every extracted detail before saving."
@@ -362,7 +430,7 @@ export default function AddMedicine() {
     }
   }
 
-  // Save medicine using existing Firebase functionality
+  // Save medicine to Firebase
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -391,12 +459,23 @@ export default function AddMedicine() {
       return;
     }
 
+    const unitPrice = Number(pricePerUnit);
+
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      alert("Please enter a valid medicine price.");
+      return;
+    }
+
     if (courseEndDate > expiryDate) {
       alert(
         "Course end date cannot be after the medicine expiry date."
       );
       return;
     }
+
+    const totalPurchaseValue = Number(
+      (totalQuantity * unitPrice).toFixed(2)
+    );
 
     try {
       setLoading(true);
@@ -408,6 +487,8 @@ export default function AddMedicine() {
         initialQuantity: totalQuantity,
         consumedQuantity: 0,
         disposedQuantity: 0,
+        pricePerUnit: unitPrice,
+        totalPurchaseValue,
         expiryDate,
         courseEndDate,
         disposalStatus: "Not disposed",
@@ -424,6 +505,11 @@ export default function AddMedicine() {
       setLoading(false);
     }
   }
+
+  // Calculate total purchase value
+  const totalValue = (
+    (Number(quantity) || 0) * (Number(pricePerUnit) || 0)
+  ).toFixed(2);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-100 p-5 md:p-10">
@@ -477,6 +563,7 @@ export default function AddMedicine() {
               <h3 className="text-lg font-extrabold text-green-900">
                 📷 Scan Medicine Packaging
               </h3>
+
               <p className="mt-2 text-sm text-gray-600">
                 Capture a photo using your phone camera or upload a medicine image.
               </p>
@@ -520,11 +607,18 @@ export default function AddMedicine() {
                 {ocrMessage}
               </div>
 
+              {priceMessage && (
+                <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                  💰 {priceMessage}
+                </div>
+              )}
+
               {ocrText.length > 0 && (
                 <div className="mt-4 rounded-xl bg-white p-4">
                   <h4 className="font-bold text-green-900">
                     Extracted Text
                   </h4>
+
                   <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-gray-700">
                     {ocrText.map((item, index) => (
                       <li key={index}>
@@ -589,7 +683,40 @@ export default function AddMedicine() {
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-800 outline-none focus:border-green-600 focus:bg-white"
               />
               <p className="mt-2 text-xs text-gray-400">
-                Enter the actual number of tablets or capsules you have.
+                Enter the actual number of tablets or capsules you have. Check this value before saving.
+              </p>
+            </div>
+
+            {/* MEDICINE PRICE */}
+            <div>
+              <label className="mb-2 block font-bold text-gray-700">
+                💰 Price per Tablet / Capsule (₹)
+              </label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                value={pricePerUnit}
+                onChange={(e) => setPricePerUnit(e.target.value)}
+                placeholder="Example: 2.50"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-800 outline-none focus:border-green-600 focus:bg-white"
+              />
+              <p className="mt-2 text-xs text-gray-400">
+                Enter the price of one tablet or capsule, not the entire strip. Verify any automatically detected price.
+              </p>
+            </div>
+
+            {/* PURCHASE VALUE PREVIEW */}
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+              <p className="text-sm font-semibold text-green-800">
+                Estimated Total Purchase Value
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-green-900">
+                ₹{totalValue}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Total quantity × price per tablet/capsule
               </p>
             </div>
 
